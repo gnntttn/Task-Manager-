@@ -1,19 +1,35 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import type { Task, Priority, Status } from '../types';
 
-const API_KEY = process.env.API_KEY;
+let ai: GoogleGenAI | null = null;
 
-if (!API_KEY) {
-  // A more user-friendly error could be shown in the UI
-  throw new Error("API_KEY environment variable is not set.");
-}
+/**
+ * Lazily initializes and returns the GoogleGenAI client.
+ * Throws an error if the API key is not configured.
+ * @returns {GoogleGenAI} The initialized AI client.
+ */
+const getAiClient = (): GoogleGenAI => {
+  if (ai) {
+    return ai;
+  }
 
-const ai = new GoogleGenAI({ apiKey: API_KEY });
+  const API_KEY = process.env.API_KEY;
+
+  if (!API_KEY) {
+    // This error is thrown only when an AI feature is used, not at app startup.
+    // The UI components have try/catch blocks to handle this gracefully.
+    throw new Error("مفتاح API الخاص بـ Gemini غير معرف. يرجى التأكد من إضافته كمتغير بيئة (environment variable) في إعدادات النشر على Netlify.");
+  }
+
+  ai = new GoogleGenAI({ apiKey: API_KEY });
+  return ai;
+};
 
 type ParsedTask = Partial<Pick<Task, 'title' | 'description' | 'priority' | 'dueDate'>>;
 
 export const parseTaskFromNaturalLanguage = async (prompt: string): Promise<ParsedTask> => {
   try {
+    const aiClient = getAiClient();
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
     const systemInstruction = `You are an intelligent assistant for a task management app. Your role is to parse user input in Arabic and extract structured task information. Today's date is ${today}. When the user gives a relative date like "tomorrow" or "next Friday", you must convert it to the absolute YYYY-MM-DD format.`;
     const userPrompt = `Parse the following task description into a structured JSON object. The description is in Arabic.
@@ -24,7 +40,7 @@ export const parseTaskFromNaturalLanguage = async (prompt: string): Promise<Pars
 
 Task Description: "${prompt}"`;
     
-    const response = await ai.models.generateContent({
+    const response = await aiClient.models.generateContent({
       model: "gemini-2.5-flash",
       contents: userPrompt,
       config: {
@@ -57,6 +73,9 @@ Task Description: "${prompt}"`;
 
   } catch (error) {
     console.error("Error parsing task with Gemini:", error);
+    if (error instanceof Error) {
+        throw error; // Re-throw the specific error from getAiClient or Gemini
+    }
     throw new Error("فشل في تحليل المهمة باستخدام الذكاء الاصطناعي.");
   }
 };
@@ -64,7 +83,8 @@ Task Description: "${prompt}"`;
 
 export const generateSubTasks = async (taskTitle: string, taskDescription?: string): Promise<string[]> => {
     try {
-        const response = await ai.models.generateContent({
+        const aiClient = getAiClient();
+        const response = await aiClient.models.generateContent({
             model: "gemini-2.5-flash",
             contents: `Based on the following task title and description, generate a list of actionable sub-tasks in Arabic. Title: "${taskTitle}". Description: "${taskDescription || 'No description'}".`,
             config: {
@@ -92,6 +112,9 @@ export const generateSubTasks = async (taskTitle: string, taskDescription?: stri
 
     } catch (error) {
         console.error("Error generating sub-tasks with Gemini:", error);
+        if (error instanceof Error) {
+            throw error;
+        }
         throw new Error("فشل في إنشاء مهام فرعية باستخدام الذكاء الاصطناعي.");
     }
 };
@@ -101,6 +124,7 @@ export const filterTasksWithAI = async (query: string, tasks: Task[]): Promise<s
         return [];
     }
     try {
+        const aiClient = getAiClient();
         const today = new Date().toISOString().split('T')[0];
         const systemInstruction = `You are an intelligent search assistant for a task management app. Your role is to analyze a user's search query in Arabic and a list of tasks, then return the IDs of the tasks that match the query. Today's date is ${today}. Interpret relative dates like "tomorrow" or "next week" based on this date.`;
         
@@ -109,7 +133,7 @@ export const filterTasksWithAI = async (query: string, tasks: Task[]): Promise<s
 
         const userPrompt = `User Query: "${query}"\n\nTasks JSON: ${JSON.stringify(tasksForPrompt)}`;
 
-        const response = await ai.models.generateContent({
+        const response = await aiClient.models.generateContent({
             model: "gemini-2.5-flash",
             contents: userPrompt,
             config: {
@@ -138,12 +162,16 @@ export const filterTasksWithAI = async (query: string, tasks: Task[]): Promise<s
 
     } catch (error) {
         console.error("Error filtering tasks with Gemini:", error);
+        if (error instanceof Error) {
+            throw error;
+        }
         throw new Error("فشل في البحث عن المهام باستخدام الذكاء الاصطناعي.");
     }
 };
 
 export const generateDailyBriefing = async (tasks: Task[]): Promise<string> => {
     try {
+        const aiClient = getAiClient();
         const today = new Date().toISOString().split('T')[0];
         const systemInstruction = `You are a helpful and motivating productivity assistant for a task management app. Your goal is to provide a clear, concise, and encouraging daily briefing for the user based on their task list. Your response must be in Arabic. Today's date is ${today}.`;
 
@@ -157,7 +185,7 @@ export const generateDailyBriefing = async (tasks: Task[]): Promise<string> => {
 Tasks:
 ${JSON.stringify(tasks, null, 2)}`;
 
-        const response = await ai.models.generateContent({
+        const response = await aiClient.models.generateContent({
             model: "gemini-2.5-flash",
             contents: userPrompt,
             config: {
@@ -169,6 +197,9 @@ ${JSON.stringify(tasks, null, 2)}`;
 
     } catch (error) {
         console.error("Error generating daily briefing with Gemini:", error);
+        if (error instanceof Error) {
+            throw error;
+        }
         throw new Error("فشل في إنشاء الملخص اليومي باستخدام الذكاء الاصطناعي.");
     }
 };
