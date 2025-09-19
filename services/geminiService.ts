@@ -8,6 +8,7 @@ let ai: GoogleGenAI | null = null;
  * Throws an error if the API key is not configured.
  * @returns {GoogleGenAI} The initialized AI client.
  */
+// FIX: Updated API key handling to use process.env.API_KEY as per the guidelines, which resolves the TypeScript error on import.meta.env.
 const getAiClient = (): GoogleGenAI => {
   if (ai) {
     return ai;
@@ -18,7 +19,7 @@ const getAiClient = (): GoogleGenAI => {
   if (!API_KEY) {
     // This error is thrown only when an AI feature is used, not at app startup.
     // The UI components have try/catch blocks to handle this gracefully.
-    throw new Error("مفتاح API الخاص بـ Gemini غير معرف. يرجى التأكد من إضافته كمتغير بيئة (environment variable) في إعدادات النشر على Netlify.");
+    throw new Error("مفتاح API_KEY الخاص بـ Gemini غير معرف. يرجى التأكد من إضافته كمتغير بيئة (environment variable).");
   }
 
   ai = new GoogleGenAI({ apiKey: API_KEY });
