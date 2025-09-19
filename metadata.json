@@ -1,0 +1,7 @@
+{
+  "name": "AI Task Manager (مدير المهام الذكي)",
+  "description": "A comprehensive task management application built with React, TypeScript, and Tailwind CSS. It features a Kanban board, project organization, and AI-powered task creation and sub-task generation using the Gemini API. The interface is in Arabic and supports RTL.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
